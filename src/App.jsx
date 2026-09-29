@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Play, 
   Pause, 
@@ -11,16 +11,23 @@ import {
   Share2, 
   CheckCircle2, 
   Circle, 
-  ChevronRight, 
   X, 
   Sparkles,
   Maximize2,
-  Copy,
+  Lock,
+  Unlock,
   Check
 } from 'lucide-react';
 
+// SET YOUR DESIRED TEACHER SECRET PIN HERE:
+const TEACHER_PIN = "1234"; 
+
 export default function App() {
-  const [role, setRole] = useState('teacher'); // 'teacher' | 'student'
+  // Role State: Default to 'student' so public visitors/projected screen cannot edit
+  const [role, setRole] = useState('student'); // 'teacher' | 'student'
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [enteredPin, setEnteredPin] = useState('');
+  const [pinError, setPinError] = useState(false);
   
   // Lesson Configuration State
   const [periodTitle, setPeriodTitle] = useState('Math 3 - Problem Solving Lab');
@@ -74,11 +81,11 @@ export default function App() {
   // Share Link Feedback
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Check URL params for student mode or room code
+  // Check saved session auth on load
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('mode') === 'student') {
-      setRole('student');
+    const isTeacherAuth = sessionStorage.getItem('pacing_teacher_auth');
+    if (isTeacherAuth === 'true') {
+      setRole('teacher');
     }
   }, []);
 
@@ -91,7 +98,6 @@ export default function App() {
       }, 1000);
     } else if (secondsRemaining === 0 && isRunning) {
       setIsRunning(false);
-      // Auto-advance to next block if available
       if (activeBlockIndex < blocks.length - 1) {
         const nextIdx = activeBlockIndex + 1;
         setActiveBlockIndex(nextIdx);
@@ -102,30 +108,47 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isRunning, secondsRemaining, activeBlockIndex, blocks]);
 
-  // Total allocated time across all blocks
   const allocatedMinutes = blocks.reduce((acc, b) => acc + Number(b.durationMinutes), 0);
-
-  // Active Block helpers
   const currentBlock = blocks[activeBlockIndex] || blocks[0];
   const currentTotalSeconds = currentBlock ? currentBlock.durationMinutes * 60 : 1;
   const progressRatio = currentBlock ? 1 - secondsRemaining / currentTotalSeconds : 0;
 
-  // Format MM:SS
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  // PIN Authentication Handler
+  const handlePinSubmit = (e) => {
+    e.preventDefault();
+    if (enteredPin === TEACHER_PIN) {
+      setRole('teacher');
+      sessionStorage.setItem('pacing_teacher_auth', 'true');
+      setIsPinModalOpen(false);
+      setEnteredPin('');
+      setPinError(false);
+    } else {
+      setPinError(true);
+      setEnteredPin('');
+    }
+  };
+
+  const handleLogoutTeacher = () => {
+    setRole('student');
+    sessionStorage.removeItem('pacing_teacher_auth');
+  };
+
   // Drag and Drop Logic
   const handleDragStart = (e, index) => {
+    if (role !== 'teacher') return;
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e, index) => {
     e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
+    if (role !== 'teacher' || draggedIndex === null || draggedIndex === index) return;
     
     const updated = [...blocks];
     const draggedItem = updated[draggedIndex];
@@ -135,7 +158,6 @@ export default function App() {
     setDraggedIndex(index);
     setBlocks(updated);
 
-    // Keep active block pointed at right item
     if (activeBlockIndex === draggedIndex) {
       setActiveBlockIndex(index);
     }
@@ -145,7 +167,6 @@ export default function App() {
     setDraggedIndex(null);
   };
 
-  // Add New Block
   const handleAddBlock = (e) => {
     e.preventDefault();
     if (!newTitle) return;
@@ -166,7 +187,6 @@ export default function App() {
     setIsAddModalOpen(false);
   };
 
-  // Delete Block
   const handleDeleteBlock = (id, idx) => {
     const updated = blocks.filter((b) => b.id !== id);
     setBlocks(updated);
@@ -178,15 +198,15 @@ export default function App() {
     }
   };
 
-  // Switch Active Block
   const selectBlock = (idx) => {
+    if (role !== 'teacher') return;
     setActiveBlockIndex(idx);
     setSecondsRemaining(blocks[idx].durationMinutes * 60);
     setIsRunning(false);
   };
 
   const copyStudentLink = () => {
-    const studentUrl = `${window.location.origin}${window.location.pathname}?mode=student`;
+    const studentUrl = window.location.origin + window.location.pathname;
     navigator.clipboard.writeText(studentUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -232,34 +252,33 @@ export default function App() {
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Auth / Mode Controls */}
         <div className="flex items-center space-x-3">
-          {role === 'teacher' && (
+          {role === 'teacher' ? (
             <>
               <button
                 onClick={copyStudentLink}
                 className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition"
               >
                 {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4 text-slate-400" />}
-                <span>{copiedLink ? 'Link Copied!' : 'Student View Link'}</span>
+                <span>{copiedLink ? 'Link Copied!' : 'Share Student Link'}</span>
               </button>
 
               <button
-                onClick={() => setRole('student')}
+                onClick={handleLogoutTeacher}
                 className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition"
               >
-                <Maximize2 className="w-4 h-4" />
-                <span>Projector View</span>
+                <Unlock className="w-4 h-4 text-emerald-400" />
+                <span>Teacher Mode Unlocked</span>
               </button>
             </>
-          )}
-
-          {role === 'student' && (
+          ) : (
             <button
-              onClick={() => setRole('teacher')}
-              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-300 transition"
+              onClick={() => setIsPinModalOpen(true)}
+              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-semibold transition"
             >
-              <span>Exit Projector View</span>
+              <Lock className="w-4 h-4" />
+              <span>Teacher Login</span>
             </button>
           )}
         </div>
@@ -285,7 +304,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Blocks List */}
           <div className="space-y-3">
             {blocks.map((block, idx) => {
               const isActive = idx === activeBlockIndex;
@@ -309,7 +327,6 @@ export default function App() {
                       : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
                   }`}
                 >
-                  {/* PROGRESS BAR (Active Block Only) */}
                   {isActive && (
                     <div
                       className="absolute top-0 left-0 bottom-0 bg-indigo-600/15 transition-all duration-1000 ease-linear pointer-events-none"
@@ -318,7 +335,6 @@ export default function App() {
                   )}
 
                   <div className="relative p-5 flex items-center justify-between gap-4 z-10">
-                    {/* Drag Grip & Status */}
                     <div className="flex items-center space-x-3">
                       {role === 'teacher' && (
                         <div className="cursor-grab text-slate-600 hover:text-slate-400 transition">
@@ -339,7 +355,6 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* Event Title */}
                       <div>
                         <h3 className={`font-bold transition-all duration-500 ${
                           isActive ? 'text-lg text-white font-extrabold' : 'text-base text-slate-300'
@@ -354,7 +369,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Right Info: Time & Resource Link */}
                     <div className="flex items-center space-x-4 flex-shrink-0">
                       {block.resourceLink && (
                         <a
@@ -398,13 +412,11 @@ export default function App() {
         <section className="lg:col-span-5 space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden flex flex-col items-center text-center space-y-6">
             
-            {/* Top Indicator */}
             <div className="flex items-center space-x-2 bg-indigo-500/10 text-indigo-400 px-3.5 py-1.5 rounded-full border border-indigo-500/20 text-xs font-semibold uppercase tracking-wider">
               <Clock className="w-3.5 h-3.5" />
               <span>Current Activity</span>
             </div>
 
-            {/* Active Event Title */}
             <h2 className="text-2xl font-black text-white max-w-sm leading-tight">
               {currentBlock ? currentBlock.title : 'No Activity Selected'}
             </h2>
@@ -419,7 +431,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* VISUAL WHEEL / PROGRESS INDICATOR */}
+            {/* PROGRESS BAR */}
             <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800 relative">
               <div 
                 className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-1000 ease-linear"
@@ -450,7 +462,7 @@ export default function App() {
               </div>
             )}
 
-            {/* Teacher Controls */}
+            {/* Teacher Only Controls */}
             {role === 'teacher' && (
               <div className="flex items-center justify-center space-x-3 pt-2 w-full">
                 <button
@@ -480,6 +492,55 @@ export default function App() {
           </div>
         </section>
       </main>
+
+      {/* TEACHER PIN LOGIN MODAL */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-5 relative text-center">
+            <button
+              onClick={() => {
+                setIsPinModalOpen(false);
+                setPinError(false);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+              <Lock className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-white">Teacher Authentication</h3>
+              <p className="text-xs text-slate-400 mt-1">Enter your 4-digit PIN to unlock edit controls.</p>
+            </div>
+
+            <form onSubmit={handlePinSubmit} className="space-y-4">
+              <input
+                type="password"
+                maxLength={4}
+                placeholder="PIN"
+                value={enteredPin}
+                onChange={(e) => setEnteredPin(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500 transition"
+                autoFocus
+              />
+
+              {pinError && (
+                <p className="text-xs text-rose-400 font-semibold">Incorrect PIN. Try again.</p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-indigo-600/25"
+              >
+                Unlock Teacher Mode
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ADD BLOCK MODAL */}
       {isAddModalOpen && (
