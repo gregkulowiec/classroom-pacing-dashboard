@@ -19,25 +19,94 @@ import {
   Eye,
   EyeOff,
   Edit2,
-  Save
+  Save,
+  Sun,
+  Moon,
+  Key,
+  Palette
 } from 'lucide-react';
 
-const TEACHER_PIN = "1234";
+const ACCENT_COLORS = {
+  blue: {
+    name: 'Royal Blue',
+    bg: 'bg-blue-600',
+    hoverBg: 'hover:bg-blue-500',
+    text: 'text-blue-500 dark:text-blue-400',
+    border: 'border-blue-500',
+    ring: 'ring-blue-500/30',
+    progressBg: 'bg-blue-600/20',
+    badgeBg: 'bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30',
+    shadow: 'shadow-blue-600/20'
+  },
+  emerald: {
+    name: 'Emerald Green',
+    bg: 'bg-emerald-600',
+    hoverBg: 'hover:bg-emerald-500',
+    text: 'text-emerald-600 dark:text-emerald-400',
+    border: 'border-emerald-500',
+    ring: 'ring-emerald-500/30',
+    progressBg: 'bg-emerald-600/20',
+    badgeBg: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+    shadow: 'shadow-emerald-600/20'
+  },
+  amber: {
+    name: 'Warm Amber',
+    bg: 'bg-amber-500',
+    hoverBg: 'hover:bg-amber-400',
+    text: 'text-amber-600 dark:text-amber-400',
+    border: 'border-amber-500',
+    ring: 'ring-amber-500/30',
+    progressBg: 'bg-amber-500/20',
+    badgeBg: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
+    shadow: 'shadow-amber-500/20'
+  },
+  cyan: {
+    name: 'Ocean Cyan',
+    bg: 'bg-cyan-600',
+    hoverBg: 'hover:bg-cyan-500',
+    text: 'text-cyan-600 dark:text-cyan-400',
+    border: 'border-cyan-500',
+    ring: 'ring-cyan-500/30',
+    progressBg: 'bg-cyan-600/20',
+    badgeBg: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30',
+    shadow: 'shadow-cyan-600/20'
+  },
+  rose: {
+    name: 'Vibrant Rose',
+    bg: 'bg-rose-600',
+    hoverBg: 'hover:bg-rose-500',
+    text: 'text-rose-600 dark:text-rose-400',
+    border: 'border-rose-500',
+    ring: 'ring-rose-500/30',
+    progressBg: 'bg-rose-600/20',
+    badgeBg: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30',
+    shadow: 'shadow-rose-600/20'
+  }
+};
 
 export default function App() {
-  const [role, setRole] = useState('student'); // 'teacher' | 'student'
+  const [role, setRole] = useState('student');
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isChangePinModalOpen, setIsChangePinModalOpen] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
-  const [pinError, setPinError] = useState(false);
-  
-  // Display Options State
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+
+  // Local Storage State Management
+  const [teacherPin, setTeacherPin] = useState(() => localStorage.getItem('pacing_teacher_pin') || '1234');
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('pacing_theme');
+    return saved ? saved === 'dark' : true;
+  });
+  const [accentKey, setAccentKey] = useState(() => localStorage.getItem('pacing_accent') || 'blue');
   const [showCountdownTimer, setShowCountdownTimer] = useState(false);
 
   // Lesson Configuration State
   const [periodTitle, setPeriodTitle] = useState('Math 3 - Problem Solving Lab');
   const [totalPeriodMinutes, setTotalPeriodMinutes] = useState(50);
-  
-  // Blocks Array
+
+  // Blocks Array State
   const [blocks, setBlocks] = useState([
     {
       id: '1',
@@ -69,17 +138,16 @@ export default function App() {
     }
   ]);
 
-  // Active Execution State
+  // Timer & Drag States
   const [activeBlockIndex, setActiveBlockIndex] = useState(0);
   const [secondsRemaining, setSecondsRemaining] = useState(8 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState(null);
 
-  // Modals / Editing States
+  // Modals & Forms
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingBlockId, setEditingBlockId] = useState(null);
   
-  // Form States for Add/Edit
   const [formTitle, setFormTitle] = useState('');
   const [formMinutes, setFormMinutes] = useState(10);
   const [formDesc, setFormDesc] = useState('');
@@ -87,7 +155,20 @@ export default function App() {
 
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Check saved session auth on load
+  const accent = ACCENT_COLORS[accentKey] || ACCENT_COLORS.blue;
+
+  useEffect(() => {
+    localStorage.setItem('pacing_theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
+
+  useEffect(() => {
+    localStorage.setItem('pacing_accent', accentKey);
+  }, [accentKey]);
+
+  useEffect(() => {
+    localStorage.setItem('pacing_teacher_pin', teacherPin);
+  }, [teacherPin]);
+
   useEffect(() => {
     const isTeacherAuth = sessionStorage.getItem('pacing_teacher_auth');
     if (isTeacherAuth === 'true') {
@@ -95,7 +176,6 @@ export default function App() {
     }
   }, []);
 
-  // Timer Effect
   useEffect(() => {
     let interval = null;
     if (isRunning && secondsRemaining > 0) {
@@ -114,7 +194,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isRunning, secondsRemaining, activeBlockIndex, blocks]);
 
-  const allocatedMinutes = blocks.reduce((acc, b) => acc + Number(b.durationMinutes), 0);
   const currentBlock = blocks[activeBlockIndex] || blocks[0];
   const currentTotalSeconds = currentBlock ? currentBlock.durationMinutes * 60 : 1;
   const progressRatio = currentBlock ? 1 - secondsRemaining / currentTotalSeconds : 0;
@@ -127,16 +206,35 @@ export default function App() {
 
   const handlePinSubmit = (e) => {
     e.preventDefault();
-    if (enteredPin === TEACHER_PIN) {
+    if (enteredPin === teacherPin) {
       setRole('teacher');
       sessionStorage.setItem('pacing_teacher_auth', 'true');
       setIsPinModalOpen(false);
       setEnteredPin('');
-      setPinError(false);
+      setPinError('');
     } else {
-      setPinError(true);
+      setPinError('Incorrect PIN code. Please try again.');
       setEnteredPin('');
     }
+  };
+
+  const handleUpdatePin = (e) => {
+    e.preventDefault();
+    if (newPinInput.length !== 4 || !/^\d+$/.test(newPinInput)) {
+      setPinError('PIN must be exactly 4 digits.');
+      return;
+    }
+    if (newPinInput !== confirmPinInput) {
+      setPinError('PIN entries do not match.');
+      return;
+    }
+
+    setTeacherPin(newPinInput);
+    setIsChangePinModalOpen(false);
+    setNewPinInput('');
+    setConfirmPinInput('');
+    setPinError('');
+    alert('Teacher PIN successfully updated!');
   };
 
   const handleLogoutTeacher = () => {
@@ -144,7 +242,6 @@ export default function App() {
     sessionStorage.removeItem('pacing_teacher_auth');
   };
 
-  // Drag and Drop Logic
   const handleDragStart = (e, index) => {
     if (role !== 'teacher') return;
     setDraggedIndex(index);
@@ -217,7 +314,6 @@ export default function App() {
     setEditingBlockId(null);
     resetForm();
 
-    // Reset current timer if editing the active block
     if (blocks[activeBlockIndex]?.id === editingBlockId) {
       setSecondsRemaining(Number(formMinutes) * 60);
       setIsRunning(false);
@@ -257,77 +353,145 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between font-sans selection:bg-indigo-500/30">
+    <div className={`min-h-screen transition-colors duration-300 font-sans selection:bg-slate-500/30 ${
+      darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'
+    }`}>
       
       {/* HEADER BAR */}
-      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-30 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="p-2.5 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            {role === 'teacher' ? (
-              <input
-                type="text"
-                value={periodTitle}
-                onChange={(e) => setPeriodTitle(e.target.value)}
-                className="bg-transparent text-xl font-bold text-white focus:outline-none focus:border-b focus:border-indigo-500 transition"
-              />
-            ) : (
-              <h1 className="text-xl font-bold text-white">{periodTitle}</h1>
-            )}
-            <div className="flex items-center space-x-3 text-xs text-slate-400 mt-0.5">
-              <span>Allocated: <strong className="text-slate-200">{allocatedMinutes} mins</strong></span>
-              <span>•</span>
-              <span className="flex items-center space-x-1">
-                <span>Period Goal:</span>
-                {role === 'teacher' ? (
-                  <input
-                    type="number"
-                    value={totalPeriodMinutes}
-                    onChange={(e) => setTotalPeriodMinutes(Number(e.target.value))}
-                    className="w-12 bg-slate-800 border border-slate-700 rounded px-1 text-center text-slate-200"
-                  />
-                ) : (
-                  <strong className="text-slate-200">{totalPeriodMinutes} mins</strong>
-                )}
-              </span>
+      <header className={`border-b sticky top-0 z-30 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur ${
+        darkMode ? 'bg-slate-900/80 border-slate-800/80' : 'bg-white/80 border-slate-200'
+      }`}>
+        <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-6 w-full sm:w-auto text-center sm:text-left">
+          <div className="flex items-center space-x-3">
+            <div className={`p-2.5 rounded-xl border ${accent.badgeBg}`}>
+              <Sparkles className="w-5 h-5" />
             </div>
+            <div>
+              {role === 'teacher' ? (
+                <input
+                  type="text"
+                  value={periodTitle}
+                  onChange={(e) => setPeriodTitle(e.target.value)}
+                  className={`bg-transparent text-xl font-bold focus:outline-none border-b border-dashed border-slate-400/50 hover:border-slate-400 transition ${
+                    darkMode ? 'text-white' : 'text-slate-900'
+                  }`}
+                  placeholder="Period Title"
+                />
+              ) : (
+                <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{periodTitle}</h1>
+              )}
+            </div>
+          </div>
+
+          {/* PROMINENT PERIOD GOAL DISPLAY */}
+          <div className={`flex items-center space-x-2 px-4 py-2 rounded-2xl border ${
+            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'
+          }`}>
+            <Clock className={`w-5 h-5 ${accent.text}`} />
+            <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
+              Period Goal:
+            </span>
+            {role === 'teacher' ? (
+              <div className="flex items-center space-x-1">
+                <input
+                  type="number"
+                  min="1"
+                  max="300"
+                  value={totalPeriodMinutes}
+                  onChange={(e) => setTotalPeriodMinutes(Number(e.target.value))}
+                  className={`w-16 text-center text-xl font-extrabold rounded-lg font-mono focus:outline-none focus:ring-2 ${accent.ring} ${
+                    darkMode ? 'bg-slate-950 text-white border-slate-700' : 'bg-white text-slate-900 border-slate-300'
+                  }`}
+                />
+                <span className="text-sm font-bold text-slate-400">min</span>
+              </div>
+            ) : (
+              <span className={`text-xl font-extrabold font-mono ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                {totalPeriodMinutes} <span className="text-sm font-normal text-slate-400">min</span>
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Global Action Controls */}
-        <div className="flex items-center space-x-3">
+        {/* CONTROLS & TOGGLES */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {/* Theme Toggle Button */}
           <button
-            onClick={() => setShowCountdownTimer(!showCountdownTimer)}
-            className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 transition"
+            onClick={() => setDarkMode(!darkMode)}
+            className={`p-2.5 rounded-xl border transition ${
+              darkMode ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+            }`}
+            title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {showCountdownTimer ? <EyeOff className="w-4 h-4 text-indigo-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
-            <span>{showCountdownTimer ? 'Hide Countdown' : 'Show Countdown'}</span>
+            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
+          {/* Accent Color Picker Selector */}
+          <div className={`flex items-center space-x-1 p-1 rounded-xl border ${
+            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'
+          }`}>
+            <Palette className="w-3.5 h-3.5 mx-1 text-slate-400" />
+            {Object.keys(ACCENT_COLORS).map((key) => (
+              <button
+                key={key}
+                onClick={() => setAccentKey(key)}
+                className={`w-5 h-5 rounded-full transition transform hover:scale-110 ${ACCENT_COLORS[key].bg} ${
+                  accentKey === key ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'opacity-70'
+                }`}
+                title={ACCENT_COLORS[key].name}
+              />
+            ))}
+          </div>
+
+          {/* Countdown Toggle */}
+          <button
+            onClick={() => setShowCountdownTimer(!showCountdownTimer)}
+            className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition ${
+              darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            {showCountdownTimer ? <EyeOff className={`w-4 h-4 ${accent.text}`} /> : <Eye className="w-4 h-4 text-slate-400" />}
+            <span className="hidden sm:inline">{showCountdownTimer ? 'Hide Timer' : 'Show Timer'}</span>
+          </button>
+
+          {/* Teacher Mode & Share Options */}
           {role === 'teacher' ? (
             <>
               <button
                 onClick={copyStudentLink}
-                className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition"
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition ${
+                  darkMode ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                }`}
               >
-                {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4 text-slate-400" />}
-                <span>{copiedLink ? 'Link Copied!' : 'Share Student Link'}</span>
+                {copiedLink ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4 text-slate-400" />}
+                <span className="hidden sm:inline">{copiedLink ? 'Copied!' : 'Share Link'}</span>
+              </button>
+
+              <button
+                onClick={() => setIsChangePinModalOpen(true)}
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition ${
+                  darkMode ? 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+                title="Change Teacher PIN"
+              >
+                <Key className="w-4 h-4 text-amber-500" />
+                <span className="hidden lg:inline">Change PIN</span>
               </button>
 
               <button
                 onClick={handleLogoutTeacher}
-                className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition"
+                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border text-xs font-semibold transition ${accent.badgeBg}`}
               >
-                <Unlock className="w-4 h-4 text-emerald-400" />
-                <span>Teacher Mode Unlocked</span>
+                <Unlock className="w-4 h-4 text-emerald-500" />
+                <span>Teacher Unlocked</span>
               </button>
             </>
           ) : (
             <button
               onClick={() => setIsPinModalOpen(true)}
-              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-semibold transition"
+              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border text-xs font-semibold transition ${
+                darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
+              }`}
             >
               <Lock className="w-4 h-4" />
               <span>Teacher Login</span>
@@ -336,13 +500,13 @@ export default function App() {
         </div>
       </header>
 
-      {/* MAIN CONTENT AREA - FULL WIDTH DISPLAY */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+      {}
+      <main className="max-w-7xl w-full mx-auto p-6 space-y-6">
         
-        {/* Top Controls Bar */}
-        <div className="flex items-center justify-between">
+        {/* TOP CONTROLS & TIMERS */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
-            <Clock className="w-4 h-4 text-indigo-400" />
+            <Clock className={`w-4 h-4 ${accent.text}`} />
             <span>Classroom Agenda & Pacing ({blocks.length} Activities)</span>
           </h2>
 
@@ -351,10 +515,10 @@ export default function App() {
               <>
                 <button
                   onClick={() => setIsRunning(!isRunning)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition ${
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition shadow-lg ${
                     isRunning
-                      ? 'bg-amber-500 text-slate-950 font-bold'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                      ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                      : `${accent.bg} ${accent.hoverBg} text-white ${accent.shadow}`
                   }`}
                 >
                   {isRunning ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
@@ -366,7 +530,9 @@ export default function App() {
                     setIsRunning(false);
                     setSecondsRemaining(currentBlock ? currentBlock.durationMinutes * 60 : 0);
                   }}
-                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition"
+                  className={`p-2 rounded-xl border transition ${
+                    darkMode ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
+                  }`}
                   title="Reset Timer"
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -377,7 +543,7 @@ export default function App() {
                     resetForm();
                     setIsAddModalOpen(true);
                   }}
-                  className="flex items-center space-x-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl transition shadow-lg shadow-indigo-600/20"
+                  className={`flex items-center space-x-1.5 text-xs font-semibold ${accent.bg} ${accent.hoverBg} text-white px-3.5 py-2 rounded-xl transition shadow-lg ${accent.shadow}`}
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Block</span>
@@ -387,7 +553,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* FULL WIDTH BLOCK LIST */}
+        {/* FULL WIDTH PACING BLOCKS LIST */}
         <div className="space-y-4">
           {blocks.map((block, idx) => {
             const isActive = idx === activeBlockIndex;
@@ -399,16 +565,18 @@ export default function App() {
                 <form
                   key={block.id}
                   onSubmit={handleSaveEdit}
-                  className="bg-slate-900 border-2 border-indigo-500 rounded-3xl p-6 shadow-2xl space-y-4"
+                  className={`border-2 rounded-3xl p-6 shadow-2xl space-y-4 ${accent.border} ${
+                    darkMode ? 'bg-slate-900' : 'bg-white'
+                  }`}
                 >
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider">
+                    <h3 className={`text-sm font-bold uppercase tracking-wider ${accent.text}`}>
                       Edit Activity Block #{idx + 1}
                     </h3>
                     <button
                       type="button"
                       onClick={() => setEditingBlockId(null)}
-                      className="text-slate-400 hover:text-white"
+                      className="text-slate-400 hover:text-slate-200"
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -423,7 +591,9 @@ export default function App() {
                         type="text"
                         value={formTitle}
                         onChange={(e) => setFormTitle(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none border ${
+                          darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                        }`}
                         required
                       />
                     </div>
@@ -438,7 +608,9 @@ export default function App() {
                         max="120"
                         value={formMinutes}
                         onChange={(e) => setFormMinutes(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        className={`w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none border ${
+                          darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                        }`}
                         required
                       />
                     </div>
@@ -452,7 +624,9 @@ export default function App() {
                       value={formDesc}
                       onChange={(e) => setFormDesc(e.target.value)}
                       rows={2}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 resize-none"
+                      className={`w-full rounded-xl px-4 py-2 text-sm focus:outline-none border resize-none ${
+                        darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                      }`}
                     />
                   </div>
 
@@ -464,7 +638,9 @@ export default function App() {
                       type="url"
                       value={formLink}
                       onChange={(e) => setFormLink(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                      className={`w-full rounded-xl px-4 py-2 text-sm focus:outline-none border ${
+                        darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                      }`}
                     />
                   </div>
 
@@ -472,13 +648,13 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setEditingBlockId(null)}
-                      className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                      className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="flex items-center space-x-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition"
+                      className={`flex items-center space-x-1.5 px-5 py-2 ${accent.bg} ${accent.hoverBg} text-white rounded-xl text-xs font-semibold transition`}
                     >
                       <Save className="w-4 h-4" />
                       <span>Save Changes</span>
@@ -500,86 +676,81 @@ export default function App() {
                   role === 'teacher' ? 'cursor-pointer' : ''
                 } ${
                   isActive
-                    ? 'bg-slate-900 border-indigo-500 shadow-2xl shadow-indigo-500/10 ring-2 ring-indigo-500/20'
+                    ? `${accent.border} shadow-xl ring-2 ${accent.ring} ${darkMode ? 'bg-slate-900' : 'bg-white'}`
                     : isPast
-                    ? 'bg-slate-900/30 border-slate-800/50 opacity-50'
-                    : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'
+                    ? `${darkMode ? 'bg-slate-900/30 border-slate-800/50' : 'bg-slate-100/50 border-slate-200'} opacity-50`
+                    : `${darkMode ? 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'}`
                 }`}
               >
-                {/* INLINE COLOR SLIDING PROGRESS FILL (Active Block) */}
+                {/* SLIDING COLOR PROGRESS BAR (No Purple) */}
                 {isActive && (
                   <div
-                    className="absolute top-0 left-0 bottom-0 bg-indigo-600/20 transition-all duration-1000 ease-linear pointer-events-none"
+                    className={`absolute top-0 left-0 bottom-0 ${accent.progressBg} transition-all duration-1000 ease-linear pointer-events-none`}
                     style={{ width: `${progressRatio * 100}%` }}
                   />
                 )}
 
                 <div className="relative p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 z-10">
-                  
-                  {/* Left Column: Drag, Status, Title, Description */}
                   <div className="flex items-start space-x-4 flex-1">
                     {role === 'teacher' && (
-                      <div className="cursor-grab text-slate-600 hover:text-slate-400 transition pt-1">
+                      <div className="cursor-grab text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition pt-1">
                         <GripVertical className="w-5 h-5" />
                       </div>
                     )}
 
                     <div className="pt-1">
                       {isPast ? (
-                        <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                        <CheckCircle2 className="w-6 h-6 text-emerald-500" />
                       ) : isActive ? (
                         <div className="relative flex items-center justify-center">
-                          <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-indigo-400 opacity-75"></span>
-                          <Circle className="w-6 h-6 text-indigo-400 fill-indigo-400/20" />
+                          <span className={`animate-ping absolute inline-flex h-4 w-4 rounded-full ${accent.bg} opacity-75`}></span>
+                          <Circle className={`w-6 h-6 ${accent.text}`} />
                         </div>
                       ) : (
-                        <Circle className="w-6 h-6 text-slate-600" />
+                        <Circle className="w-6 h-6 text-slate-400" />
                       )}
                     </div>
 
                     <div className="space-y-1 flex-1">
                       <div className="flex items-center space-x-3">
                         <h3 className={`font-black tracking-tight transition-all duration-300 ${
-                          isActive ? 'text-2xl text-white' : 'text-xl text-slate-200'
+                          isActive ? `text-2xl ${darkMode ? 'text-white' : 'text-slate-900'}` : `text-xl ${darkMode ? 'text-slate-200' : 'text-slate-800'}`
                         }`}>
                           {block.title}
                         </h3>
 
                         {isActive && (
-                          <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider border ${accent.badgeBg}`}>
                             Active
                           </span>
                         )}
                       </div>
 
                       {block.description && (
-                        <p className="text-sm text-slate-300 leading-relaxed max-w-3xl">
+                        <p className={`text-sm leading-relaxed max-w-3xl ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                           {block.description}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Right Column: Timer, Link, Teacher Actions */}
                   <div className="flex items-center space-x-6 flex-shrink-0 self-end md:self-center">
-                    
-                    {/* Optional Numerical Countdown vs Static Minutes */}
                     <div className="text-right font-mono">
                       {isActive && showCountdownTimer ? (
                         <div>
-                          <div className="text-3xl font-black text-indigo-400 tracking-tight">
+                          <div className={`text-3xl font-black tracking-tight ${accent.text}`}>
                             {formatTime(secondsRemaining)}
                           </div>
-                          <div className="text-[10px] text-slate-500 uppercase tracking-widest font-sans">
+                          <div className="text-[10px] text-slate-400 uppercase tracking-widest font-sans">
                             Remaining
                           </div>
                         </div>
                       ) : (
                         <div>
-                          <div className={`text-2xl font-black ${isActive ? 'text-indigo-400' : 'text-slate-300'}`}>
+                          <div className={`text-2xl font-black ${isActive ? accent.text : (darkMode ? 'text-slate-300' : 'text-slate-700')}`}>
                             {block.durationMinutes} min
                           </div>
-                          <div className="text-[10px] text-slate-500 uppercase tracking-widest font-sans">
+                          <div className="text-[10px] text-slate-400 uppercase tracking-widest font-sans">
                             Allocated
                           </div>
                         </div>
@@ -592,7 +763,9 @@ export default function App() {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-slate-700 transition"
+                        className={`p-3 rounded-2xl border transition ${
+                          darkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                        }`}
                         title="Open Resource Link"
                       >
                         <ExternalLink className="w-5 h-5" />
@@ -600,10 +773,10 @@ export default function App() {
                     )}
 
                     {role === 'teacher' && (
-                      <div className="flex items-center space-x-1 pl-2 border-l border-slate-800">
+                      <div className={`flex items-center space-x-1 pl-2 border-l ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                         <button
                           onClick={(e) => startEditBlock(block, e)}
-                          className="p-2 text-slate-400 hover:text-indigo-400 transition"
+                          className={`p-2 transition ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
                           title="Edit Block"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -613,7 +786,7 @@ export default function App() {
                             e.stopPropagation();
                             handleDeleteBlock(block.id, idx);
                           }}
-                          className="p-2 text-slate-600 hover:text-rose-400 transition"
+                          className="p-2 text-slate-400 hover:text-rose-500 transition"
                           title="Delete Block"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -628,27 +801,30 @@ export default function App() {
         </div>
       </main>
 
-      {/* TEACHER PIN LOGIN MODAL */}
+      {}
+      {/* LOGIN MODAL */}
       {isPinModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-5 relative text-center">
+          <div className={`rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-5 relative text-center border ${
+            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
             <button
               onClick={() => {
                 setIsPinModalOpen(false);
-                setPinError(false);
+                setPinError('');
               }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white transition"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 transition"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="mx-auto w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+            <div className={`mx-auto w-12 h-12 rounded-2xl flex items-center justify-center border ${accent.badgeBg}`}>
               <Lock className="w-6 h-6" />
             </div>
 
             <div>
-              <h3 className="text-lg font-bold text-white">Teacher Authentication</h3>
-              <p className="text-xs text-slate-400 mt-1">Enter your 4-digit PIN to unlock edit controls.</p>
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Teacher Login</h3>
+              <p className="text-xs text-slate-400 mt-1">Enter your custom 4-digit PIN to access controls.</p>
             </div>
 
             <form onSubmit={handlePinSubmit} className="space-y-4">
@@ -658,17 +834,19 @@ export default function App() {
                 placeholder="PIN"
                 value={enteredPin}
                 onChange={(e) => setEnteredPin(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500 transition"
+                className={`w-full border rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest focus:outline-none transition ${
+                  darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                }`}
                 autoFocus
               />
 
               {pinError && (
-                <p className="text-xs text-rose-400 font-semibold">Incorrect PIN. Try again.</p>
+                <p className="text-xs text-rose-500 font-semibold">{pinError}</p>
               )}
 
               <button
                 type="submit"
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-indigo-600/25"
+                className={`w-full py-3 ${accent.bg} ${accent.hoverBg} text-white rounded-xl text-xs font-semibold transition shadow-lg ${accent.shadow}`}
               >
                 Unlock Teacher Mode
               </button>
@@ -677,15 +855,82 @@ export default function App() {
         </div>
       )}
 
-      {/* ADD BLOCK MODAL */}
+      {/* CHANGE PIN MODAL */}
+      {isChangePinModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className={`rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-5 relative text-center border ${
+            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <button
+              onClick={() => {
+                setIsChangePinModalOpen(false);
+                setPinError('');
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="mx-auto w-12 h-12 rounded-2xl flex items-center justify-center border bg-amber-500/15 text-amber-500 border-amber-500/30">
+              <Key className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Set Custom Teacher PIN</h3>
+              <p className="text-xs text-slate-400 mt-1">This PIN will be saved in your browser storage.</p>
+            </div>
+
+            <form onSubmit={handleUpdatePin} className="space-y-3">
+              <input
+                type="password"
+                maxLength={4}
+                placeholder="New 4-Digit PIN"
+                value={newPinInput}
+                onChange={(e) => setNewPinInput(e.target.value)}
+                className={`w-full border rounded-xl px-4 py-2.5 text-center text-xl font-mono tracking-widest focus:outline-none transition ${
+                  darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                }`}
+                required
+              />
+
+              <input
+                type="password"
+                maxLength={4}
+                placeholder="Confirm New PIN"
+                value={confirmPinInput}
+                onChange={(e) => setConfirmPinInput(e.target.value)}
+                className={`w-full border rounded-xl px-4 py-2.5 text-center text-xl font-mono tracking-widest focus:outline-none transition ${
+                  darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                }`}
+                required
+              />
+
+              {pinError && (
+                <p className="text-xs text-rose-500 font-semibold">{pinError}</p>
+              )}
+
+              <button
+                type="submit"
+                className={`w-full py-3 ${accent.bg} ${accent.hoverBg} text-white rounded-xl text-xs font-semibold transition shadow-lg ${accent.shadow}`}
+              >
+                Save Custom PIN
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 relative">
+          <div className={`rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 relative border ${
+            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Add Pacing Element</h3>
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Add Pacing Element</h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-white transition"
+                className="text-slate-400 hover:text-slate-200 transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -701,7 +946,9 @@ export default function App() {
                   placeholder="e.g. Small Group Inquiry"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
+                  className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition ${
+                    darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
                   required
                 />
               </div>
@@ -716,7 +963,9 @@ export default function App() {
                   max="120"
                   value={formMinutes}
                   onChange={(e) => setFormMinutes(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
+                  className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition ${
+                    darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
                   required
                 />
               </div>
@@ -730,7 +979,9 @@ export default function App() {
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}
                   rows={3}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition resize-none"
+                  className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition resize-none ${
+                    darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
                 />
               </div>
 
@@ -743,7 +994,9 @@ export default function App() {
                   placeholder="https://..."
                   value={formLink}
                   onChange={(e) => setFormLink(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
+                  className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none transition ${
+                    darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
                 />
               </div>
 
@@ -751,13 +1004,13 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-white transition"
+                  className="px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-indigo-600/25"
+                  className={`px-5 py-2.5 ${accent.bg} ${accent.hoverBg} text-white rounded-xl text-xs font-semibold transition shadow-lg ${accent.shadow}`}
                 >
                   Add Element
                 </button>
