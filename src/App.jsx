@@ -13,22 +13,26 @@ import {
   Circle, 
   X, 
   Sparkles,
-  Maximize2,
   Lock,
   Unlock,
-  Check
+  Check,
+  Eye,
+  EyeOff,
+  Edit2,
+  Save
 } from 'lucide-react';
 
-// SET YOUR DESIRED TEACHER SECRET PIN HERE:
-const TEACHER_PIN = "1234"; 
+const TEACHER_PIN = "1234";
 
 export default function App() {
-  // Role State: Default to 'student' so public visitors/projected screen cannot edit
   const [role, setRole] = useState('student'); // 'teacher' | 'student'
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState(false);
   
+  // Display Options State
+  const [showCountdownTimer, setShowCountdownTimer] = useState(false);
+
   // Lesson Configuration State
   const [periodTitle, setPeriodTitle] = useState('Math 3 - Problem Solving Lab');
   const [totalPeriodMinutes, setTotalPeriodMinutes] = useState(50);
@@ -71,14 +75,16 @@ export default function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState(null);
 
-  // New Block Modal
+  // Modals / Editing States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newMinutes, setNewMinutes] = useState(10);
-  const [newDesc, setNewDesc] = useState('');
-  const [newLink, setNewLink] = useState('');
+  const [editingBlockId, setEditingBlockId] = useState(null);
+  
+  // Form States for Add/Edit
+  const [formTitle, setFormTitle] = useState('');
+  const [formMinutes, setFormMinutes] = useState(10);
+  const [formDesc, setFormDesc] = useState('');
+  const [formLink, setFormLink] = useState('');
 
-  // Share Link Feedback
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Check saved session auth on load
@@ -119,7 +125,6 @@ export default function App() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // PIN Authentication Handler
   const handlePinSubmit = (e) => {
     e.preventDefault();
     if (enteredPin === TEACHER_PIN) {
@@ -169,22 +174,61 @@ export default function App() {
 
   const handleAddBlock = (e) => {
     e.preventDefault();
-    if (!newTitle) return;
+    if (!formTitle) return;
 
     const newBlock = {
       id: String(Date.now()),
-      title: newTitle,
-      durationMinutes: Number(newMinutes) || 5,
-      description: newDesc,
-      resourceLink: newLink
+      title: formTitle,
+      durationMinutes: Number(formMinutes) || 5,
+      description: formDesc,
+      resourceLink: formLink
     };
 
     setBlocks([...blocks, newBlock]);
-    setNewTitle('');
-    setNewMinutes(10);
-    setNewDesc('');
-    setNewLink('');
+    resetForm();
     setIsAddModalOpen(false);
+  };
+
+  const startEditBlock = (block, e) => {
+    e.stopPropagation();
+    setEditingBlockId(block.id);
+    setFormTitle(block.title);
+    setFormMinutes(block.durationMinutes);
+    setFormDesc(block.description);
+    setFormLink(block.resourceLink);
+  };
+
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    const updated = blocks.map((b) => {
+      if (b.id === editingBlockId) {
+        return {
+          ...b,
+          title: formTitle,
+          durationMinutes: Number(formMinutes) || 1,
+          description: formDesc,
+          resourceLink: formLink
+        };
+      }
+      return b;
+    });
+
+    setBlocks(updated);
+    setEditingBlockId(null);
+    resetForm();
+
+    // Reset current timer if editing the active block
+    if (blocks[activeBlockIndex]?.id === editingBlockId) {
+      setSecondsRemaining(Number(formMinutes) * 60);
+      setIsRunning(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormTitle('');
+    setFormMinutes(10);
+    setFormDesc('');
+    setFormLink('');
   };
 
   const handleDeleteBlock = (id, idx) => {
@@ -252,8 +296,16 @@ export default function App() {
           </div>
         </div>
 
-        {/* Auth / Mode Controls */}
+        {/* Global Action Controls */}
         <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowCountdownTimer(!showCountdownTimer)}
+            className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 transition"
+          >
+            {showCountdownTimer ? <EyeOff className="w-4 h-4 text-indigo-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+            <span>{showCountdownTimer ? 'Hide Countdown' : 'Show Countdown'}</span>
+          </button>
+
           {role === 'teacher' ? (
             <>
               <button
@@ -284,197 +336,29 @@ export default function App() {
         </div>
       </header>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* MAIN CONTENT AREA - FULL WIDTH DISPLAY */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
         
-        {/* LEFT COLUMN: Pacing Blocks Dashboard (7 Cols) */}
-        <section className="lg:col-span-7 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-              Classroom Pacing Blocks ({blocks.length})
-            </h2>
+        {/* Top Controls Bar */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+            <Clock className="w-4 h-4 text-indigo-400" />
+            <span>Classroom Agenda & Pacing ({blocks.length} Activities)</span>
+          </h2>
+
+          <div className="flex items-center space-x-3">
             {role === 'teacher' && (
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center space-x-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition shadow-lg shadow-indigo-600/20"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Element</span>
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            {blocks.map((block, idx) => {
-              const isActive = idx === activeBlockIndex;
-              const isPast = idx < activeBlockIndex;
-
-              return (
-                <div
-                  key={block.id}
-                  draggable={role === 'teacher'}
-                  onDragStart={(e) => handleDragStart(e, idx)}
-                  onDragOver={(e) => handleDragOver(e, idx)}
-                  onDragEnd={handleDragEnd}
-                  onClick={() => role === 'teacher' && selectBlock(idx)}
-                  className={`relative overflow-hidden rounded-2xl border transition-all duration-300 ${
-                    role === 'teacher' ? 'cursor-pointer' : ''
-                  } ${
-                    isActive
-                      ? 'bg-slate-900 border-indigo-500/80 shadow-2xl shadow-indigo-500/10 ring-1 ring-indigo-500/30'
-                      : isPast
-                      ? 'bg-slate-900/40 border-slate-800/60 opacity-60'
-                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  {isActive && (
-                    <div
-                      className="absolute top-0 left-0 bottom-0 bg-indigo-600/15 transition-all duration-1000 ease-linear pointer-events-none"
-                      style={{ width: `${progressRatio * 100}%` }}
-                    />
-                  )}
-
-                  <div className="relative p-5 flex items-center justify-between gap-4 z-10">
-                    <div className="flex items-center space-x-3">
-                      {role === 'teacher' && (
-                        <div className="cursor-grab text-slate-600 hover:text-slate-400 transition">
-                          <GripVertical className="w-5 h-5" />
-                        </div>
-                      )}
-
-                      <div>
-                        {isPast ? (
-                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                        ) : isActive ? (
-                          <div className="relative flex items-center justify-center">
-                            <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-indigo-400 opacity-75"></span>
-                            <Circle className="w-5 h-5 text-indigo-400 fill-indigo-400/20" />
-                          </div>
-                        ) : (
-                          <Circle className="w-5 h-5 text-slate-600" />
-                        )}
-                      </div>
-
-                      <div>
-                        <h3 className={`font-bold transition-all duration-500 ${
-                          isActive ? 'text-lg text-white font-extrabold' : 'text-base text-slate-300'
-                        }`}>
-                          {block.title}
-                        </h3>
-                        {block.description && (
-                          <p className="text-xs text-slate-400 line-clamp-1 mt-0.5 max-w-md">
-                            {block.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-4 flex-shrink-0">
-                      {block.resourceLink && (
-                        <a
-                          href={block.resourceLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-slate-700 transition"
-                          title="Open Resource Link"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-
-                      <div className="text-right font-mono">
-                        <div className={`text-base font-bold ${isActive ? 'text-indigo-400' : 'text-slate-300'}`}>
-                          {block.durationMinutes} min
-                        </div>
-                      </div>
-
-                      {role === 'teacher' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteBlock(block.id, idx);
-                          }}
-                          className="p-1.5 text-slate-600 hover:text-rose-400 transition"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* RIGHT COLUMN: Active Focus Display & Controls (5 Cols) */}
-        <section className="lg:col-span-5 space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden flex flex-col items-center text-center space-y-6">
-            
-            <div className="flex items-center space-x-2 bg-indigo-500/10 text-indigo-400 px-3.5 py-1.5 rounded-full border border-indigo-500/20 text-xs font-semibold uppercase tracking-wider">
-              <Clock className="w-3.5 h-3.5" />
-              <span>Current Activity</span>
-            </div>
-
-            <h2 className="text-2xl font-black text-white max-w-sm leading-tight">
-              {currentBlock ? currentBlock.title : 'No Activity Selected'}
-            </h2>
-
-            {/* BIG COUNTDOWN DISPLAY */}
-            <div className="relative my-2">
-              <div className="text-6xl lg:text-7xl font-black font-mono tracking-tighter bg-gradient-to-b from-white to-slate-400 bg-clip-text text-transparent">
-                {formatTime(secondsRemaining)}
-              </div>
-              <div className="text-xs text-slate-500 font-mono mt-1 uppercase tracking-widest">
-                Time Remaining
-              </div>
-            </div>
-
-            {/* PROGRESS BAR */}
-            <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800 relative">
-              <div 
-                className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-1000 ease-linear"
-                style={{ width: `${progressRatio * 100}%` }}
-              />
-            </div>
-
-            {/* Description & Links */}
-            {currentBlock && (
-              <div className="space-y-4 pt-2 border-t border-slate-800/80 w-full text-left">
-                {currentBlock.description && (
-                  <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-xl border border-slate-800/60">
-                    {currentBlock.description}
-                  </p>
-                )}
-
-                {currentBlock.resourceLink && (
-                  <a
-                    href={currentBlock.resourceLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-3.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition group"
-                  >
-                    <span className="truncate pr-2">Resource: {currentBlock.resourceLink}</span>
-                    <ExternalLink className="w-4 h-4 flex-shrink-0 group-hover:translate-x-0.5 transition" />
-                  </a>
-                )}
-              </div>
-            )}
-
-            {/* Teacher Only Controls */}
-            {role === 'teacher' && (
-              <div className="flex items-center justify-center space-x-3 pt-2 w-full">
+              <>
                 <button
                   onClick={() => setIsRunning(!isRunning)}
-                  className={`flex-1 flex items-center justify-center space-x-2 py-3.5 px-6 rounded-2xl font-semibold transition shadow-xl ${
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-semibold transition ${
                     isRunning
-                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                      : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/25'
+                      ? 'bg-amber-500 text-slate-950 font-bold'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-500'
                   }`}
                 >
-                  {isRunning ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
-                  <span>{isRunning ? 'Pause' : 'Start Timer'}</span>
+                  {isRunning ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
+                  <span>{isRunning ? 'Pause Timer' : 'Start Active Block'}</span>
                 </button>
 
                 <button
@@ -482,15 +366,266 @@ export default function App() {
                     setIsRunning(false);
                     setSecondsRemaining(currentBlock ? currentBlock.durationMinutes * 60 : 0);
                   }}
-                  className="p-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition"
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition"
                   title="Reset Timer"
                 >
-                  <RotateCcw className="w-5 h-5" />
+                  <RotateCcw className="w-4 h-4" />
                 </button>
-              </div>
+
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setIsAddModalOpen(true);
+                  }}
+                  className="flex items-center space-x-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl transition shadow-lg shadow-indigo-600/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Block</span>
+                </button>
+              </>
             )}
           </div>
-        </section>
+        </div>
+
+        {/* FULL WIDTH BLOCK LIST */}
+        <div className="space-y-4">
+          {blocks.map((block, idx) => {
+            const isActive = idx === activeBlockIndex;
+            const isPast = idx < activeBlockIndex;
+            const isEditing = editingBlockId === block.id;
+
+            if (isEditing) {
+              return (
+                <form
+                  key={block.id}
+                  onSubmit={handleSaveEdit}
+                  className="bg-slate-900 border-2 border-indigo-500 rounded-3xl p-6 shadow-2xl space-y-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-wider">
+                      Edit Activity Block #{idx + 1}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setEditingBlockId(null)}
+                      className="text-slate-400 hover:text-white"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
+                        Activity Title
+                      </label>
+                      <input
+                        type="text"
+                        value={formTitle}
+                        onChange={(e) => setFormTitle(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
+                        Duration (Mins)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="120"
+                        value={formMinutes}
+                        onChange={(e) => setFormMinutes(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
+                      Description / Instructions
+                    </label>
+                    <textarea
+                      value={formDesc}
+                      onChange={(e) => setFormDesc(e.target.value)}
+                      rows={2}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">
+                      Resource Link (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      value={formLink}
+                      onChange={(e) => setFormLink(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end space-x-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingBlockId(null)}
+                      className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex items-center space-x-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save Changes</span>
+                    </button>
+                  </div>
+                </form>
+              );
+            }
+
+            return (
+              <div
+                key={block.id}
+                draggable={role === 'teacher'}
+                onDragStart={(e) => handleDragStart(e, idx)}
+                onDragOver={(e) => handleDragOver(e, idx)}
+                onDragEnd={handleDragEnd}
+                onClick={() => role === 'teacher' && selectBlock(idx)}
+                className={`relative overflow-hidden rounded-3xl border transition-all duration-500 ${
+                  role === 'teacher' ? 'cursor-pointer' : ''
+                } ${
+                  isActive
+                    ? 'bg-slate-900 border-indigo-500 shadow-2xl shadow-indigo-500/10 ring-2 ring-indigo-500/20'
+                    : isPast
+                    ? 'bg-slate-900/30 border-slate-800/50 opacity-50'
+                    : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'
+                }`}
+              >
+                {/* INLINE COLOR SLIDING PROGRESS FILL (Active Block) */}
+                {isActive && (
+                  <div
+                    className="absolute top-0 left-0 bottom-0 bg-indigo-600/20 transition-all duration-1000 ease-linear pointer-events-none"
+                    style={{ width: `${progressRatio * 100}%` }}
+                  />
+                )}
+
+                <div className="relative p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 z-10">
+                  
+                  {/* Left Column: Drag, Status, Title, Description */}
+                  <div className="flex items-start space-x-4 flex-1">
+                    {role === 'teacher' && (
+                      <div className="cursor-grab text-slate-600 hover:text-slate-400 transition pt-1">
+                        <GripVertical className="w-5 h-5" />
+                      </div>
+                    )}
+
+                    <div className="pt-1">
+                      {isPast ? (
+                        <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                      ) : isActive ? (
+                        <div className="relative flex items-center justify-center">
+                          <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-indigo-400 opacity-75"></span>
+                          <Circle className="w-6 h-6 text-indigo-400 fill-indigo-400/20" />
+                        </div>
+                      ) : (
+                        <Circle className="w-6 h-6 text-slate-600" />
+                      )}
+                    </div>
+
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center space-x-3">
+                        <h3 className={`font-black tracking-tight transition-all duration-300 ${
+                          isActive ? 'text-2xl text-white' : 'text-xl text-slate-200'
+                        }`}>
+                          {block.title}
+                        </h3>
+
+                        {isActive && (
+                          <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Active
+                          </span>
+                        )}
+                      </div>
+
+                      {block.description && (
+                        <p className="text-sm text-slate-300 leading-relaxed max-w-3xl">
+                          {block.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Timer, Link, Teacher Actions */}
+                  <div className="flex items-center space-x-6 flex-shrink-0 self-end md:self-center">
+                    
+                    {/* Optional Numerical Countdown vs Static Minutes */}
+                    <div className="text-right font-mono">
+                      {isActive && showCountdownTimer ? (
+                        <div>
+                          <div className="text-3xl font-black text-indigo-400 tracking-tight">
+                            {formatTime(secondsRemaining)}
+                          </div>
+                          <div className="text-[10px] text-slate-500 uppercase tracking-widest font-sans">
+                            Remaining
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className={`text-2xl font-black ${isActive ? 'text-indigo-400' : 'text-slate-300'}`}>
+                            {block.durationMinutes} min
+                          </div>
+                          <div className="text-[10px] text-slate-500 uppercase tracking-widest font-sans">
+                            Allocated
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {block.resourceLink && (
+                      <a
+                        href={block.resourceLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-slate-700 transition"
+                        title="Open Resource Link"
+                      >
+                        <ExternalLink className="w-5 h-5" />
+                      </a>
+                    )}
+
+                    {role === 'teacher' && (
+                      <div className="flex items-center space-x-1 pl-2 border-l border-slate-800">
+                        <button
+                          onClick={(e) => startEditBlock(block, e)}
+                          className="p-2 text-slate-400 hover:text-indigo-400 transition"
+                          title="Edit Block"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteBlock(block.id, idx);
+                          }}
+                          className="p-2 text-slate-600 hover:text-rose-400 transition"
+                          title="Delete Block"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </main>
 
       {/* TEACHER PIN LOGIN MODAL */}
@@ -564,8 +699,8 @@ export default function App() {
                 <input
                   type="text"
                   placeholder="e.g. Small Group Inquiry"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
                   required
                 />
@@ -579,8 +714,8 @@ export default function App() {
                   type="number"
                   min="1"
                   max="120"
-                  value={newMinutes}
-                  onChange={(e) => setNewMinutes(e.target.value)}
+                  value={formMinutes}
+                  onChange={(e) => setFormMinutes(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
                   required
                 />
@@ -588,12 +723,12 @@ export default function App() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase text-slate-400 mb-1.5">
-                  Description / Prompt
+                  Description / Instructions
                 </label>
                 <textarea
                   placeholder="Instructions for students during this segment..."
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
+                  value={formDesc}
+                  onChange={(e) => setFormDesc(e.target.value)}
                   rows={3}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition resize-none"
                 />
@@ -606,8 +741,8 @@ export default function App() {
                 <input
                   type="url"
                   placeholder="https://..."
-                  value={newLink}
-                  onChange={(e) => setNewLink(e.target.value)}
+                  value={formLink}
+                  onChange={(e) => setFormLink(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition"
                 />
               </div>
